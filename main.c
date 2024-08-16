@@ -4,6 +4,8 @@
 #include <string.h>
 #include <cjson/cJSON.h>
 #include <regex.h>
+#include <stdbool.h>
+
 
 struct memory {
     char* response;
@@ -11,21 +13,24 @@ struct memory {
 };
 
 void printAvailableTimezones();
-int searchTimezone(char* timezone);
+bool searchTimezone(char** timezone, size_t size);
 size_t cb(void* data, size_t size, size_t nmemb, void* clientp);    // Callback function to write the data to the memory
 
 int main(){
 
-    unsigned int numTimezones = 0;
-    char timezone[BUFSIZ];
+    char* timezone = malloc(sizeof(char) * 1024);
+    memset(timezone, '\0', 1024);
 
-    while (numTimezones != 1){
+    do {
         printf("Enter timezone: \n");
         scanf("%s", timezone);
 
-        numTimezones = searchTimezone(timezone);
-
+        if (strcmp(timezone, "list") == 0){
+            printAvailableTimezones();
+            continue;
+        }
     }
+    while (searchTimezone(&timezone, strlen(timezone)) == false);
 
     char* url = malloc(sizeof(char) * 100);
     snprintf(url, 100, "https://timeapi.io/api/Time/current/zone?timeZone=");
@@ -72,17 +77,6 @@ int main(){
         if (cJSON_IsString(time) && (time->valuestring != NULL)){
             printf("Time: %s\n", time->valuestring);
         }
-        /*
-        cJSON_ArrayForEach(e, json){
-            str = cJSON_Print(e);
-            if (str == NULL){
-                fprintf(stderr, "Failed to print.\n");
-            }
-            else {
-                printf("%s\n", str);
-            }
-        };
-        */
 
         curl_easy_cleanup(curl);
         cJSON_Delete(json);
@@ -93,11 +87,14 @@ int main(){
     }
     curl_global_cleanup();
 
+    free(chunk.response);
+    free(timezone);
+    free(url);
     return 0;
 }
 
 
-int searchTimezone(char* timezone){
+bool searchTimezone(char** timezone, size_t size){
     FILE* fp = fopen("available_timezones.txt", "r");
 
     if (fp == NULL){
@@ -105,20 +102,22 @@ int searchTimezone(char* timezone){
         return 0;
     }
 
-    char buffer[1024] = "";
+    char* buffer = malloc(sizeof(char) * 1024);
+    char* timezoneFound = malloc(sizeof(char) * 1024);
+    memset(timezoneFound, '\0', 1024);
+    bool found = false;
     regex_t regex;
     int reti;
 
-    reti = regcomp(&regex, timezone, REG_ICASE);
+    reti = regcomp(&regex, *timezone, REG_ICASE);
     if (reti){
         fprintf(stderr, "Could not compile regex\n");
         return 0;
     }
 
-
     char c = '1';
     unsigned int i = 0;
-    unsigned int count = 0;
+    unsigned int timezoneCount = 0;
     printf("Timezones found: \n");
 
     while (c != EOF){
@@ -127,7 +126,8 @@ int searchTimezone(char* timezone){
             buffer[i] = '\0';
             reti = regexec(&regex, buffer, 0, NULL, 0);
             if (reti == 0){
-                count++;
+                timezoneCount++;
+                memcpy(timezoneFound, buffer, strlen(buffer));
                 printf("%s\n", buffer);
             }
             i = 0;
@@ -140,14 +140,20 @@ int searchTimezone(char* timezone){
     regfree(&regex);
     fclose(fp);
 
-    if (count == 0){
+    if (timezoneCount == 0){
         printf("No timezones found\nPlease enter a valid timezone\n");
     }
-    else if (count > 1){
+    else if (timezoneCount > 1){
         printf("Multiple timezones found\nPlease enter a more specific timezone\n");
     }
+    else {
+        found = true;
+        memcpy(*timezone, timezoneFound, strlen(timezoneFound));
+    }
 
-    return count;
+    free(buffer);
+    free(timezoneFound);
+    return found;
 }
 
 
