@@ -4,6 +4,7 @@ This is a tool used to show different timezones on a scale from 0000 to 2300 so 
 The program uses IANA timezone format: AREA/LOCATION. Eg: for Morocco timezone, you must type in, Africa/Casablanca or Casablanca (note: search is not case sensitive). There are a few exceptions but, in general, this is the convention to follow.
 
 If you want to see the whole list of available timezones you can type in, type 'all' when prompted to enter a timezone.
+
 ---
 ## Running program
 To run the program, first compile it using this command:
