@@ -6,6 +6,7 @@
 #include <regex.h>
 #include <stdbool.h>
 
+// TODO: Add feature to add more timezones
 
 struct memory {
     char* response;
@@ -19,6 +20,10 @@ size_t cb(void* data, size_t size, size_t nmemb, void* clientp);    // Callback 
 int main(){
 
     char* timezone = malloc(sizeof(char) * 1024);
+    if (timezone == NULL){
+        fprintf(stderr, "Failed to allocate memory\n");
+        return 1;
+    }
     memset(timezone, '\0', 1024);
 
     do {
@@ -33,6 +38,12 @@ int main(){
     while (searchTimezone(&timezone, strlen(timezone)) == false);
 
     char* url = malloc(sizeof(char) * 100);
+    if (url == NULL){
+        fprintf(stderr, "Failed to allocate memory\n");
+        return 1;
+    }
+    memset(url, '\0', 100);
+
     snprintf(url, 100, "https://timeapi.io/api/Time/current/zone?timeZone=");
     int size = (strlen(timezone)+1)*sizeof(char);
     memcpy(url+50, timezone, size);     // append timezone to url
@@ -104,7 +115,13 @@ bool searchTimezone(char** timezone, size_t size){
 
     char* buffer = malloc(sizeof(char) * 1024);
     char* timezoneFound = malloc(sizeof(char) * 1024);
+    if (buffer == NULL || timezoneFound == NULL){
+        fprintf(stderr, "Failed to allocate memory\n");
+        return 0;
+    }
+    memset(buffer, '\0', 1024);
     memset(timezoneFound, '\0', 1024);
+
     bool found = false;
     regex_t regex;
     int reti;
@@ -181,6 +198,7 @@ size_t cb(void* data, size_t size, size_t nmemb, void* clientp){
 
     char* ptr = realloc(mem->response, mem->size + realsize + 1);       // Reallocate the memory to the new size, mem->response means grab the contents of the response field pointed by mem variable. Or (*mem).response
     if (!ptr){
+        fprintf(stderr, "Failed to allocate memory\n");
         return 0;       // Return 0 if the memory allocation fails
     }
 
