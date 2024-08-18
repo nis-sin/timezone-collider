@@ -8,35 +8,54 @@
 
 // TODO: Add feature to add more timezones
 
-struct memory {
+struct memory {     // Memory struct to store the response from the API
     char* response;
     size_t size;
 };
 
-void printAvailableTimezones();
-bool searchTimezone(char** timezone, size_t size);
-size_t cb(void* data, size_t size, size_t nmemb, void* clientp);    // Callback function to write the data to the memory
+struct timezoneData {       // Timezone struct to store the timezone data
+    char* timezone;
+    unsigned int hours;
+    unsigned int minutes;
+};
 
+void printAvailableTimezones();
+bool searchTimezone(char** timezone);       // why char** timezone works but char* timezone does not work?
+size_t cb(void* data, size_t size, size_t nmemb, void* clientp);    // Callback function to write the data to the memory
+void timezoneInput(struct timezoneData* timezone);
+void buildRequest(struct timezoneData* timezones);
 
 int main(){
 
-    char* timezone = malloc(sizeof(char) * 1024);       // Allocate memory for the timezone variable to store the timezone from user input
-    if (timezone == NULL){
+    unsigned int numTimezones;
+    printf("Welcome to the timezone converter\n");
+    printf("Enter 'list' to see available timezones\n");
+    printf("Enter the number of the timezones you want to compare/see\n");
+    if (scanf("%u", &numTimezones) != 1){
+        fprintf(stderr, "Invalid input\n");
+        return 1;
+    };
+    fflush(stdin);          // Clear the input buffer
+
+    struct timezoneData timezones[numTimezones];       // Initialize the timezone struct array
+
+    char* userTimezone = malloc(sizeof(char) * 1024);       // Allocate memory for the timezone variable to store the timezone from user input
+    if (userTimezone == NULL){
         fprintf(stderr, "Failed to allocate memory\n");
         return 1;
     }
-    memset(timezone, '\0', 1024);
+    memset(userTimezone, '\0', 1024);
 
     do {            // Loop until a valid timezone is entered
         printf("Enter timezone: \n");
-        scanf("%s", timezone);
+        scanf("%s", userTimezone);
 
-        if (strcmp(timezone, "list") == 0){
+        if (strcmp(userTimezone, "list") == 0){
             printAvailableTimezones();
             continue;
         }
     }
-    while (searchTimezone(&timezone, strlen(timezone)) == false);
+    while (searchTimezone(&userTimezone) == false);
 
     // Create the http request to the API
     char* request = malloc(sizeof(char) * 100);         // Allocate memory for the request variable to store the http request to API
@@ -49,11 +68,8 @@ int main(){
     char* baseUrl = "https://timeapi.io/api/timezone/zone?timeZone=";
 
     snprintf(request, 100, baseUrl);
-    int size = (strlen(timezone)+1)*sizeof(char);
-    memcpy(request+strlen(baseUrl), timezone, size);     // append timezone to http request
-
-    char* utcRequest = "https://timeapi.io/api/time/current/zone?timeZone=UTC";
-
+    int size = (strlen(userTimezone)+1)*sizeof(char);
+    memcpy(request+strlen(baseUrl), userTimezone, size);     // append timezone to http request
 
     // Initialize the curl session and send HTTP request
     CURL* curl;
@@ -97,11 +113,17 @@ int main(){
         // Retrieve UTC offset data from the json object
         cJSON *currentUtcOffset = cJSON_GetObjectItem(json, "currentUtcOffset");
         cJSON *offsetSeconds = cJSON_GetObjectItem(currentUtcOffset, "seconds");
-        unsigned int hours;
-        unsigned int minutes;
+        int hours;
+        int minutes;
         if (cJSON_IsNumber(offsetSeconds) && (offsetSeconds->valueint != INT_MAX || offsetSeconds->valueint != INT_MIN)){
             hours = offsetSeconds->valueint / 3600;
             minutes = (offsetSeconds->valueint % 3600) / 60;
+            printf("UTC offset: %i hours %i minutes\n", hours, abs(minutes));
+        }
+        hours < 0 ? hours = 24 + hours : hours;
+        if (minutes < 0){
+            minutes += 60;
+            hours--;
         }
 
         printf("UTC:\n");
@@ -109,7 +131,7 @@ int main(){
             printf("%i:00\t", i);
         }
         printf("\n");
-        printf("%s:\n", timezone);
+        printf("%s:\n", userTimezone);
         for (int i = 0; i < 24; i++){
             printf("%i:%i\t", (i+hours)%24, minutes);
         }
@@ -124,13 +146,35 @@ int main(){
 
     curl_global_cleanup();
     free(chunk.response);
-    free(timezone);
+    free(userTimezone);
     free(request);
     return 0;
 }
 
 
-bool searchTimezone(char** timezone, size_t size){
+void timezoneInput(struct timezoneData* timezone){
+    char* userTimezone = malloc(sizeof(char) * 1024);       // Allocate memory for the timezone variable to store the timezone from user input
+    if (userTimezone == NULL){
+        fprintf(stderr, "Failed to allocate memory\n");
+        return;
+    }
+    memset(userTimezone, '\0', 1024);
+
+    do {            // Loop until a valid timezone is entered
+        printf("Enter timezone: \n");
+        scanf("%s", userTimezone);
+
+        if (strcmp(userTimezone, "list") == 0){
+            printAvailableTimezones();
+            continue;
+        }
+    }
+    while (searchTimezone(&userTimezone) == false);
+    timezone->timezone = userTimezone;
+}
+
+
+bool searchTimezone(char** timezone){
     FILE* fp = fopen("available_timezones.txt", "r");
 
     if (fp == NULL){
