@@ -38,6 +38,9 @@ int main(){
     fflush(stdin);          // Clear the input buffer
 
     struct timezoneData timezones[numTimezones];       // Initialize the timezone struct array
+    for (int i = 0; i < numTimezones; i++){
+        timezones[i] = (struct timezoneData) {.timezone = NULL, .hours = 0, .minutes = 0};
+    }
 
     char* userTimezone = malloc(sizeof(char) * 1024);       // Allocate memory for the timezone variable to store the timezone from user input
     if (userTimezone == NULL){
