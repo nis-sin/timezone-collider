@@ -6,8 +6,6 @@
 #include <regex.h>
 #include <stdbool.h>
 
-// TODO: Add feature to add more timezones
-
 struct memory {     // Memory struct to store the response from the API
     char* response;
     size_t size;
@@ -71,62 +69,60 @@ int main(){
 
     for (int i = 0; i < numTimezones; i++){
 
-        if (curl){
-
-            chunk.response = malloc(1);
-            chunk.size = 0;
-
-            // Send request for user input timezone to the API
-            curl_easy_setopt(curl, CURLOPT_URL, timezones[i].request);
-            curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, cb);
-            curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void*) &chunk);
-            curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, errorBuffer);
-            responseCode = curl_easy_perform(curl);
-
-            if (responseCode != CURLE_OK){
-                printf("Request failed: %s\n", curl_easy_strerror(responseCode));
-                printf("Error: %s\n", errorBuffer);
-            }
-
-            // Parse the json response
-            cJSON* json = cJSON_Parse(chunk.response);
-            cJSON* e = NULL;
-            char* str = NULL;
-
-            if (json == NULL){
-                const char* error_ptr = cJSON_GetErrorPtr();
-                if (error_ptr != NULL){
-                    fprintf(stderr, "Error: %s\n", error_ptr);
-                }
-                cJSON_Delete(json);
-                return 1;
-            }
-
-            // Retrieve UTC offset data from the json object
-            cJSON *currentUtcOffset = cJSON_GetObjectItem(json, "currentUtcOffset");
-            cJSON *offsetSeconds = cJSON_GetObjectItem(currentUtcOffset, "seconds");
-            int hours;
-            int minutes;
-            if (cJSON_IsNumber(offsetSeconds) && (offsetSeconds->valueint != INT_MAX || offsetSeconds->valueint != INT_MIN)){
-                hours = offsetSeconds->valueint / 3600;
-                minutes = (offsetSeconds->valueint % 3600) / 60;
-                printf("%s UTC offset: %i hours %i minutes\n", timezones[i].timezone, hours, abs(minutes));
-            }
-            hours < 0 ? hours = 24 + hours : hours;
-            if (minutes < 0){
-                minutes += 60;
-                hours--;
-            }
-            timezones[i].hours = hours;
-            timezones[i].minutes = minutes;
-
-            cJSON_Delete(json);
-            free(chunk.response);
-        }
-        else {
+        if (!curl){
             fprintf(stderr, "curl_easy_init() failed\n");
             return 1;
         }
+
+        chunk.response = malloc(1);
+        chunk.size = 0;
+
+        // Send request for user input timezone to the API
+        curl_easy_setopt(curl, CURLOPT_URL, timezones[i].request);
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, cb);
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void*) &chunk);
+        curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, errorBuffer);
+        responseCode = curl_easy_perform(curl);
+
+        if (responseCode != CURLE_OK){
+            printf("Request failed: %s\n", curl_easy_strerror(responseCode));
+            printf("Error: %s\n", errorBuffer);
+        }
+
+        // Parse the json response
+        cJSON* json = cJSON_Parse(chunk.response);
+        cJSON* e = NULL;
+        char* str = NULL;
+
+        if (json == NULL){
+            const char* error_ptr = cJSON_GetErrorPtr();
+            if (error_ptr != NULL){
+                fprintf(stderr, "Error: %s\n", error_ptr);
+            }
+            cJSON_Delete(json);
+            return 1;
+        }
+
+        // Retrieve UTC offset data from the json object
+        cJSON *currentUtcOffset = cJSON_GetObjectItem(json, "currentUtcOffset");
+        cJSON *offsetSeconds = cJSON_GetObjectItem(currentUtcOffset, "seconds");
+        int hours;
+        int minutes;
+        if (cJSON_IsNumber(offsetSeconds) && (offsetSeconds->valueint != INT_MAX || offsetSeconds->valueint != INT_MIN)){
+            hours = offsetSeconds->valueint / 3600;
+            minutes = (offsetSeconds->valueint % 3600) / 60;
+            printf("%s UTC offset: %i hours %i minutes\n", timezones[i].timezone, hours, abs(minutes));
+        }
+        hours < 0 ? hours = 24 + hours : hours;
+        if (minutes < 0){
+            minutes += 60;
+            hours--;
+        }
+        timezones[i].hours = hours;
+        timezones[i].minutes = minutes;
+
+        cJSON_Delete(json);
+        free(chunk.response);
     }
 
     printf("UTC:\n");
@@ -166,6 +162,7 @@ void buildRequest(struct timezoneData* timezoneData){
 
 void timezoneInput(struct timezoneData* timezoneData){
     do {            // Loop until a valid timezone is entered
+        fflush(stdin);      // Clear the input buffer -> seems to resolve a bug where the program would skip the timezone input
         printf("Enter timezone: \n");
         scanf("%s", timezoneData->timezone);
 
